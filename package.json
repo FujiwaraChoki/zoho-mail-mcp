@@ -1,0 +1,31 @@
+{
+  "name": "zoho-mail-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Zoho Mail - read, send, search, reply to, and delete emails from AI assistants",
+  "type": "module",
+  "license": "MIT",
+  "author": "Sami Hindi",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FujiwaraChoki/zoho-mail-mcp.git"
+  },
+  "keywords": [
+    "mcp",
+    "zoho",
+    "email",
+    "claude",
+    "ai",
+    "model-context-protocol"
+  ],
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "setup": "bun run setup.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}
