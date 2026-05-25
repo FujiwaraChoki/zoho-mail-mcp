@@ -6,7 +6,10 @@
  *   bun run setup.ts --verify  # Verify existing credentials work
  */
 
-const ZOHO_EU_OAUTH = "https://accounts.zoho.eu/oauth/v2";
+const ZOHO_DC = process.env.ZOHO_DATACENTER ?? "eu";
+const ZOHO_TLD = ZOHO_DC === "us" ? "com" : ZOHO_DC;
+const ZOHO_EU_OAUTH = `https://accounts.zoho.${ZOHO_TLD}/oauth/v2`;
+const ZOHO_MAIL_API = `https://mail.zoho.${ZOHO_TLD}/api`;
 
 async function verify() {
   const clientId = process.env.ZOHO_CLIENT_ID;
@@ -43,7 +46,7 @@ async function verify() {
   console.log("Token refresh: OK");
 
   // Test account access
-  const accountRes = await fetch("https://mail.zoho.eu/api/accounts", {
+  const accountRes = await fetch(`${ZOHO_MAIL_API}/accounts`, {
     headers: { Authorization: `Zoho-oauthtoken ${(tokenData as { access_token: string }).access_token}` },
   });
 

@@ -20,11 +20,11 @@ const server = new McpServer({
 
 server.tool(
   "list_folders",
-  "List all mail folders with unread/total counts.",
+  "List all mail folders. Pass includeCounts=true to also return unread/total counts (slow — paginates each folder).",
   listFoldersSchema.shape,
-  async () => {
+  async (input) => {
     try {
-      const result = await listFolders(config);
+      const result = await listFolders(config, input);
       return { content: [{ type: "text", text: result }] };
     } catch (error) {
       return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };

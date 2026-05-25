@@ -18,15 +18,29 @@ export async function zohoFetch(
 
   const token = await getAccessToken(config);
   const url = path.startsWith("http") ? path : `${config.mailApiBase}${path}`;
+  const headers = {
+    Authorization: `Zoho-oauthtoken ${token}`,
+    "Content-Type": "application/json",
+    ...options.headers,
+  };
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      Authorization: `Zoho-oauthtoken ${token}`,
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
+  // Retry transient network failures (ConnectionRefused, ECONNRESET, etc.) with backoff.
+  const MAX_NETWORK_RETRIES = 3;
+  let response: Response | null = null;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= MAX_NETWORK_RETRIES; attempt++) {
+    try {
+      response = await fetch(url, { ...options, headers });
+      break;
+    } catch (err) {
+      lastErr = err;
+      if (attempt === MAX_NETWORK_RETRIES) throw err;
+      const backoff = 500 * 2 ** attempt;
+      console.error(`[client] Network error (${(err as Error).message}), retrying in ${backoff}ms...`);
+      await new Promise((r) => setTimeout(r, backoff));
+    }
+  }
+  if (!response) throw lastErr ?? new Error("zohoFetch: no response");
 
   // Retry once on 401 (token may have expired)
   if (response.status === 401 && retryOn401) {
