@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/fujiwarachoki-zoho-mail-mcp-badge.png)](https://mseep.ai/app/fujiwarachoki-zoho-mail-mcp)
+
 # Zoho Mail MCP Server
 
 An [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server that connects AI assistants like Claude to your Zoho Mail account. Read, send, search, reply to, and delete emails directly from your AI workflow.
