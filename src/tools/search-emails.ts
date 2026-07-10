@@ -41,7 +41,9 @@ export async function searchEmails(config: ZohoConfig, input: SearchEmailsInput)
   }
 
   const lines = results.map((e) => {
-    const date = e.sentDateInGMT || e.receivedTime;
+    // receivedTime is Zoho's own server-side receipt stamp (reliable).
+    // sentDateInGMT runs ~7h ahead regardless of sender — prefer receivedTime.
+    const date = e.receivedTime || e.sentDateInGMT;
     const attachment = e.hasAttachment === "1" ? " [attachment]" : "";
     return `- **${e.subject}**${attachment}\n  From: ${e.sender} <${e.fromAddress}>\n  Date: ${date}\n  ID: ${e.messageId} | Folder: ${e.folderId}\n  ${e.summary || ""}`;
   });
