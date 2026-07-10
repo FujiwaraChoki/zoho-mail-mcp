@@ -50,7 +50,11 @@ export async function listEmails(config: ZohoConfig, input: ListEmailsInput): Pr
   }
 
   const lines = emails.map((e) => {
-    const date = e.sentDateInGMT || e.receivedTime;
+    // receivedTime is Zoho's own server-side receipt stamp (reliable).
+    // sentDateInGMT is the sender-claimed Date header and, despite its name,
+    // has been observed ~7h ahead of receivedTime regardless of sender —
+    // account-timezone mislabeled as GMT. Prefer receivedTime.
+    const date = e.receivedTime || e.sentDateInGMT;
     const attachment = e.hasAttachment === "1" ? " [attachment]" : "";
     const unread = e.status2 === "0" ? " [unread]" : "";
     return `- **${e.subject}**${unread}${attachment}\n  From: ${e.sender} <${e.fromAddress}>\n  Date: ${date}\n  ID: ${e.messageId} | Folder: ${e.folderId}`;

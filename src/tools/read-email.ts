@@ -50,7 +50,9 @@ export async function readEmail(config: ZohoConfig, input: ReadEmailInput): Prom
     parts.push(`**CC:** ${details.ccAddress}`);
   }
 
-  parts.push(`**Date:** ${details.sentDateInGMT || details.receivedTime}`);
+  // receivedTime is Zoho's own server-side receipt stamp (reliable).
+  // sentDateInGMT runs ~7h ahead regardless of sender — prefer receivedTime.
+  parts.push(`**Date:** ${details.receivedTime || details.sentDateInGMT}`);
 
   if (details.hasAttachment === "1") {
     parts.push(`**Attachments:** Yes`);
