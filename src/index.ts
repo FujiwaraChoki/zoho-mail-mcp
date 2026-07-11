@@ -44,7 +44,7 @@ server.tool(
 
 server.tool(
   "list_folders",
-  "List all mail folders with unread/total counts.",
+  "List all mail folders with their IDs.",
   listFoldersSchema.shape,
   async (input) => {
     try {

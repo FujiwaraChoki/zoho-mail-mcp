@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { ZohoConfig } from "../src/config.js";
 import { clearTokenCache } from "../src/auth.js";
-import { ZohoApiError, formatZohoDate, htmlToPlainText, zohoFetch, zohoJson } from "../src/client.js";
+import { ZohoApiError, formatEmailTimestamps, formatZohoDate, htmlToPlainText, zohoFetch, zohoJson } from "../src/client.js";
 
 const originalFetch = globalThis.fetch;
 
@@ -44,6 +44,22 @@ describe("zohoFetch", () => {
     expect(response.status).toBe(200);
     expect(calls).toHaveLength(3);
   });
+
+  test("does not retry non-idempotent requests after a network failure", async () => {
+    const calls: string[] = [];
+    globalThis.fetch = (async (input) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.includes("/token")) {
+        return Response.json({ access_token: "token", expires_in: 3600, token_type: "Bearer", api_domain: "" });
+      }
+      throw new Error("connection reset after send");
+    }) as typeof fetch;
+
+    await expect(zohoFetch(config(), "/messages", { method: "POST", body: "{}" }))
+      .rejects.toThrow("connection reset after send");
+    expect(calls).toHaveLength(2);
+  });
 });
 
 describe("zohoJson", () => {
@@ -70,4 +86,14 @@ test("htmlToPlainText removes unsafe markup and preserves readable breaks", () =
 
 test("formatZohoDate converts millisecond epoch strings", () => {
   expect(formatZohoDate("1709856408000")).toBe("2024-03-08T00:06:48.000Z");
+});
+
+test("formatEmailTimestamps keeps sent and received meanings distinct", () => {
+  expect(formatEmailTimestamps("1709856408000", 1709856468000)).toEqual({
+    sent: "2024-03-08T00:06:48.000Z",
+    received: "2024-03-08T00:07:48.000Z",
+  });
+  expect(formatEmailTimestamps(undefined, "1709856468000")).toEqual({
+    received: "2024-03-08T00:07:48.000Z",
+  });
 });

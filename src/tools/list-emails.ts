@@ -3,7 +3,7 @@
 import { z } from "zod";
 import type { ZohoConfig } from "../config.js";
 import type { ZohoEmailSummary } from "../types.js";
-import { formatZohoDate, zohoData, getAccountId } from "../client.js";
+import { formatEmailTimestamps, zohoData, getAccountId } from "../client.js";
 
 export const listEmailsSchema = z.object({
   folderId: z.string().optional().describe("Optionally limit results to a folder ID. Use list_folders to get IDs."),
@@ -74,10 +74,14 @@ export async function listEmails(config: ZohoConfig, input: ListEmailsInput): Pr
   }
 
   const lines = emails.map((e) => {
-    const date = formatZohoDate(e.sentDateInGMT || e.receivedTime);
+    const timestamps = formatEmailTimestamps(e.sentDateInGMT, e.receivedTime);
     const attachment = String(e.hasAttachment) === "1" ? " [attachment]" : "";
     const unread = e.status === "0" || e.status === "unread" ? " [unread]" : "";
-    return `- **${e.subject}**${unread}${attachment}\n  From: ${e.sender} <${e.fromAddress}>\n  Date: ${date}\n  ID: ${e.messageId} | Folder: ${e.folderId}`;
+    const timeLines = [
+      timestamps.sent && `  Sent: ${timestamps.sent}`,
+      timestamps.received && `  Received: ${timestamps.received}`,
+    ].filter(Boolean).join("\n");
+    return `- **${e.subject}**${unread}${attachment}\n  From: ${e.sender} <${e.fromAddress}>\n${timeLines}\n  ID: ${e.messageId} | Folder: ${e.folderId}`;
   });
 
   return `Emails (${emails.length} results, starting at ${start}):\n\n${lines.join("\n\n")}`;

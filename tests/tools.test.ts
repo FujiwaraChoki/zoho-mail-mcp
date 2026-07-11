@@ -3,7 +3,9 @@ import { deleteEmailSchema } from "../src/tools/delete-email.js";
 import { manageLabelSchema } from "../src/tools/labels.js";
 import { updateEmailsSchema } from "../src/tools/update-emails.js";
 import { buildListEmailsParams, listEmailsSchema } from "../src/tools/list-emails.js";
-import { buildSearchKey, buildSearchParams, searchEmailsSchema } from "../src/tools/search-emails.js";
+import { buildSearchKey, buildSearchParams, getSearchReceivedTime, searchEmailsSchema } from "../src/tools/search-emails.js";
+import { formatFolders } from "../src/tools/list-folders.js";
+import { resolveMailFormat } from "../src/tools/send-email.js";
 
 describe("tool schemas", () => {
   test("accepts supported bulk actions", () => {
@@ -64,5 +66,23 @@ describe("mail query construction", () => {
     expect(() => listEmailsSchema.parse({ start: 0 })).toThrow();
     expect(searchEmailsSchema.parse({ query: "invoice", limit: 200 }).limit).toBe(200);
     expect(() => searchEmailsSchema.parse({ query: "invoice", limit: 201 })).toThrow();
+  });
+});
+
+describe("Zoho response normalization", () => {
+  test("formats folders without nonexistent count fields", () => {
+    expect(formatFolders([{ folderId: "1", folderName: "Inbox", folderType: "Inbox" }]))
+      .toBe("Mail Folders:\n- Inbox (ID: 1)");
+  });
+
+  test("uses lowercase receivedtime from search responses", () => {
+    expect(getSearchReceivedTime({ receivedtime: 1709856468000 })).toBe(1709856468000);
+    expect(getSearchReceivedTime({ receivedTime: "1709856408000", receivedtime: 1709856468000 }))
+      .toBe("1709856408000");
+  });
+
+  test("keeps omitted mail format plaintext without HTML guessing", () => {
+    expect(resolveMailFormat(undefined)).toBe("plaintext");
+    expect(resolveMailFormat("html")).toBe("html");
   });
 });
