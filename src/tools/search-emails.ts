@@ -3,7 +3,7 @@
 import { z } from "zod";
 import type { ZohoConfig } from "../config.js";
 import type { ZohoSearchResult } from "../types.js";
-import { formatZohoDate, zohoData, getAccountId } from "../client.js";
+import { formatEmailTimestamps, zohoData, getAccountId } from "../client.js";
 
 const searchFieldSchema = z.enum(["entire", "content", "subject", "sender", "to", "cc", "fileName", "fileContent"]);
 const zohoDateSchema = z.string().regex(/^\d{2}-[A-Za-z]{3}-\d{4}$/, "Use DD-MMM-YYYY, for example 12-Sep-2025");
@@ -29,6 +29,11 @@ export const searchEmailsSchema = z.object({
 });
 
 export type SearchEmailsInput = z.infer<typeof searchEmailsSchema>;
+
+/** Normalizes Zoho's camel-case and lowercase search response variants. */
+export function getSearchReceivedTime(email: Pick<ZohoSearchResult, "receivedTime" | "receivedtime">): string | number | undefined {
+  return email.receivedTime ?? email.receivedtime;
+}
 
 function quoteSearchValue(value: string): string {
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
@@ -96,11 +101,14 @@ export async function searchEmails(config: ZohoConfig, input: SearchEmailsInput)
   }
 
   const lines = results.map((email) => {
-    const received = email.receivedTime ?? (email.receivedtime !== undefined ? String(email.receivedtime) : undefined);
-    const date = formatZohoDate(String(email.sentDateInGMT || received || ""));
+    const timestamps = formatEmailTimestamps(email.sentDateInGMT, getSearchReceivedTime(email));
     const attachment = String(email.hasAttachment) === "1" ? " [attachment]" : "";
     const unread = email.status === "unread" || email.status === "0" ? " [unread]" : "";
-    return `- **${email.subject}**${unread}${attachment}\n  From: ${email.sender} <${email.fromAddress}>\n  Date: ${date}\n  ID: ${email.messageId} | Folder: ${email.folderId}\n  ${email.summary || ""}`;
+    const timeLines = [
+      timestamps.sent && `  Sent: ${timestamps.sent}`,
+      timestamps.received && `  Received: ${timestamps.received}`,
+    ].filter(Boolean).join("\n");
+    return `- **${email.subject}**${unread}${attachment}\n  From: ${email.sender} <${email.fromAddress}>\n${timeLines}\n  ID: ${email.messageId} | Folder: ${email.folderId}\n  ${email.summary || ""}`;
   });
 
   return `Search results for "${input.query}" (${results.length} results, starting at ${start}):\n\n${lines.join("\n\n")}`;

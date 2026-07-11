@@ -6,6 +6,7 @@ import { clearTokenCache, getAccessToken } from "./auth.js";
 import { waitForSlot } from "./rate-limiter.js";
 
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+const RETRYABLE_METHODS = new Set(["GET", "HEAD", "OPTIONS", "PUT", "DELETE"]);
 const accountCache = new Map<string, ZohoAccount[]>();
 
 /** An HTTP or Zoho API failure with structured context. */
@@ -44,6 +45,8 @@ export async function zohoFetch(
   options: RequestInit = {},
 ): Promise<Response> {
   const url = path.startsWith("http") ? path : `${config.mailApiBase}${path}`;
+  const method = (options.method ?? "GET").toUpperCase();
+  const canRetry = RETRYABLE_METHODS.has(method);
   let refreshed = false;
 
   for (let attempt = 0; ; attempt += 1) {
@@ -66,7 +69,7 @@ export async function zohoFetch(
           : AbortSignal.timeout(config.requestTimeoutMs),
       });
     } catch (error) {
-      if (attempt >= config.maxRetries || options.signal?.aborted) throw error;
+      if (!canRetry || attempt >= config.maxRetries || options.signal?.aborted) throw error;
       await delay(retryDelay(undefined, attempt));
       continue;
     }
@@ -77,7 +80,7 @@ export async function zohoFetch(
       continue;
     }
 
-    if (RETRYABLE_STATUS.has(response.status) && attempt < config.maxRetries) {
+    if (canRetry && RETRYABLE_STATUS.has(response.status) && attempt < config.maxRetries) {
       await response.body?.cancel();
       await delay(retryDelay(response, attempt));
       continue;
@@ -155,15 +158,27 @@ export async function getAccountId(config: ZohoConfig): Promise<string> {
 }
 
 /** Formats Zoho's epoch timestamp strings as ISO dates when possible. */
-export function formatZohoDate(value: string | undefined): string {
+export function formatZohoDate(value: string | number | undefined): string {
   if (!value) return "Unknown";
-  if (/^\d{10,13}$/.test(value)) {
-    const numeric = Number(value);
-    const milliseconds = value.length === 10 ? numeric * 1000 : numeric;
+  const stringValue = String(value);
+  if (/^\d{10,13}$/.test(stringValue)) {
+    const numeric = Number(stringValue);
+    const milliseconds = stringValue.length === 10 ? numeric * 1000 : numeric;
     return new Date(milliseconds).toISOString();
   }
-  const parsed = Date.parse(value);
-  return Number.isNaN(parsed) ? value : new Date(parsed).toISOString();
+  const parsed = Date.parse(stringValue);
+  return Number.isNaN(parsed) ? stringValue : new Date(parsed).toISOString();
+}
+
+/** Formats distinct sent and received timestamps without conflating their meaning. */
+export function formatEmailTimestamps(
+  sentDate: string | number | undefined,
+  receivedDate: string | number | undefined,
+): { sent?: string; received?: string } {
+  return {
+    ...(sentDate !== undefined && sentDate !== "" && { sent: formatZohoDate(sentDate) }),
+    ...(receivedDate !== undefined && receivedDate !== "" && { received: formatZohoDate(receivedDate) }),
+  };
 }
 
 /** Converts common HTML email markup to readable plain text. */

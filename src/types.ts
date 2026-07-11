@@ -10,10 +10,8 @@ export interface ZohoAccount {
 export interface ZohoFolder {
   folderId: string;
   folderName: string;
-  folderPath: string;
-  messageCount: number;
-  unreadMessageCount: number;
   folderType: string;
+  path?: string;
 }
 
 export interface ZohoEmailSummary {

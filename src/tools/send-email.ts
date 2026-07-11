@@ -9,7 +9,7 @@ export const sendEmailSchema = z.object({
   toAddress: z.string().describe("Recipient email address."),
   subject: z.string().describe("Email subject line."),
   content: z.string().describe("Email body content."),
-  mailFormat: z.enum(["html", "plaintext"]).optional().describe("Email format (default: html)."),
+  mailFormat: z.enum(["html", "plaintext"]).optional().describe("Email format (default: plaintext)."),
   ccAddress: z.string().optional().describe("CC recipients (comma-separated)."),
   bccAddress: z.string().optional().describe("BCC recipients (comma-separated)."),
   askReceipt: z.boolean().optional().describe("Request a read receipt."),
@@ -20,6 +20,11 @@ export const sendEmailSchema = z.object({
 });
 
 export type SendEmailInput = z.infer<typeof sendEmailSchema>;
+
+/** Resolves outbound format without guessing from user-controlled content. */
+export function resolveMailFormat(mailFormat: SendEmailInput["mailFormat"]): "html" | "plaintext" {
+  return mailFormat ?? "plaintext";
+}
 
 export async function sendEmail(config: ZohoConfig, input: SendEmailInput): Promise<string> {
   if (input.scheduleType === 6 && (!input.scheduleTime || !input.timeZone)) {
@@ -38,7 +43,7 @@ export async function sendEmail(config: ZohoConfig, input: SendEmailInput): Prom
     toAddress: input.toAddress,
     subject: input.subject,
     content: input.content,
-    mailFormat: input.mailFormat ?? "html",
+    mailFormat: resolveMailFormat(input.mailFormat),
   };
 
   if (input.ccAddress) payload.ccAddress = input.ccAddress;

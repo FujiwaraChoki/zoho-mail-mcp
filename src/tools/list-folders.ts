@@ -1,4 +1,4 @@
-/** List all mail folders with unread counts. */
+/** List all mail folders. */
 
 import { z } from "zod";
 import type { ZohoConfig } from "../config.js";
@@ -6,7 +6,7 @@ import type { ZohoFolder } from "../types.js";
 import { zohoData, getAccountId } from "../client.js";
 
 export const listFoldersSchema = z.object({
-  refresh: z.boolean().optional().describe("Refresh counts instead of using the short-lived cache."),
+  refresh: z.boolean().optional().describe("Refresh folder details instead of using the short-lived cache."),
 });
 
 let cache: { folders: ZohoFolder[]; expiresAt: number } | null = null;
@@ -23,14 +23,12 @@ export async function listFolders(config: ZohoConfig, refresh = false): Promise<
   return formatFolders(folders);
 }
 
-function formatFolders(folders: ZohoFolder[]): string {
+export function formatFolders(folders: ZohoFolder[]): string {
   if (!folders || folders.length === 0) {
     return "No folders found.";
   }
 
-  const lines = folders.map((f) =>
-    `- ${f.folderName} (ID: ${f.folderId}) - ${f.unreadMessageCount} unread / ${f.messageCount} total`
-  );
+  const lines = folders.map((folder) => `- ${folder.folderName} (ID: ${folder.folderId})`);
 
   return `Mail Folders:\n${lines.join("\n")}`;
 }

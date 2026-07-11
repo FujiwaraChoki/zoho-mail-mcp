@@ -3,7 +3,7 @@
 import { z } from "zod";
 import type { ZohoConfig } from "../config.js";
 import type { ZohoEmailContent, ZohoEmailDetails } from "../types.js";
-import { formatZohoDate, zohoData, getAccountId, htmlToPlainText } from "../client.js";
+import { formatEmailTimestamps, zohoData, getAccountId, htmlToPlainText } from "../client.js";
 
 export const readEmailSchema = z.object({
   messageId: z.string().describe("The message ID to read."),
@@ -36,7 +36,9 @@ export async function readEmail(config: ZohoConfig, input: ReadEmailInput): Prom
     parts.push(`**CC:** ${details.ccAddress}`);
   }
 
-  parts.push(`**Date:** ${formatZohoDate(details.sentDateInGMT || details.receivedTime)}`);
+  const timestamps = formatEmailTimestamps(details.sentDateInGMT, details.receivedTime);
+  if (timestamps.sent) parts.push(`**Sent:** ${timestamps.sent}`);
+  if (timestamps.received) parts.push(`**Received:** ${timestamps.received}`);
 
   if (details.hasAttachment === "1") {
     parts.push(`**Attachments:** Yes`);
