@@ -3,27 +3,22 @@
 import { z } from "zod";
 import type { ZohoConfig } from "../config.js";
 import type { ZohoFolder } from "../types.js";
-import { zohoFetch, getAccountId } from "../client.js";
+import { zohoData, getAccountId } from "../client.js";
 
-export const listFoldersSchema = z.object({});
+export const listFoldersSchema = z.object({
+  refresh: z.boolean().optional().describe("Refresh counts instead of using the short-lived cache."),
+});
 
-let cachedFolders: ZohoFolder[] | null = null;
+let cache: { folders: ZohoFolder[]; expiresAt: number } | null = null;
 
-export async function listFolders(config: ZohoConfig): Promise<string> {
-  if (cachedFolders) {
-    return formatFolders(cachedFolders);
+export async function listFolders(config: ZohoConfig, refresh = false): Promise<string> {
+  if (!refresh && cache && Date.now() < cache.expiresAt) {
+    return formatFolders(cache.folders);
   }
 
   const accountId = await getAccountId(config);
-  const response = await zohoFetch(config, `/accounts/${accountId}/folders`);
-
-  if (!response.ok) {
-    throw new Error(`Failed to list folders: ${response.status} ${await response.text()}`);
-  }
-
-  const body = await response.json();
-  const folders = (body as { data: ZohoFolder[] }).data;
-  cachedFolders = folders;
+  const folders = await zohoData<ZohoFolder[]>(config, `/accounts/${accountId}/folders`);
+  cache = { folders, expiresAt: Date.now() + 30_000 };
 
   return formatFolders(folders);
 }
