@@ -3,37 +3,57 @@
 import type { ZohoConfig } from "./config.js";
 import type { ZohoTokenResponse } from "./types.js";
 
-let cachedToken: string | null = null;
-let tokenExpiry = 0;
-let refreshPromise: Promise<string> | null = null;
+interface TokenState {
+  token: string | null;
+  expiry: number;
+  refreshPromise: Promise<string> | null;
+}
+
+const states = new Map<string, TokenState>();
+
+function stateFor(config: ZohoConfig): TokenState {
+  const key = `${config.oauthBase}:${config.clientId}:${config.refreshToken}`;
+  let state = states.get(key);
+  if (!state) {
+    state = { token: null, expiry: 0, refreshPromise: null };
+    states.set(key, state);
+  }
+  return state;
+}
 
 /** Returns a valid access token, refreshing if needed. */
 export async function getAccessToken(config: ZohoConfig): Promise<string> {
-  if (cachedToken && Date.now() < tokenExpiry) {
-    return cachedToken;
+  const state = stateFor(config);
+  if (state.token && Date.now() < state.expiry) {
+    return state.token;
   }
 
   // Mutex: if a refresh is already in progress, wait for it
-  if (refreshPromise) {
-    return refreshPromise;
+  if (state.refreshPromise) {
+    return state.refreshPromise;
   }
 
-  refreshPromise = refreshAccessToken(config);
+  state.refreshPromise = refreshAccessToken(config, state);
   try {
-    const token = await refreshPromise;
+    const token = await state.refreshPromise;
     return token;
   } finally {
-    refreshPromise = null;
+    state.refreshPromise = null;
   }
 }
 
 /** Clears the cached token, forcing a refresh on next call. */
-export function clearTokenCache(): void {
-  cachedToken = null;
-  tokenExpiry = 0;
+export function clearTokenCache(config?: ZohoConfig): void {
+  if (!config) {
+    states.clear();
+    return;
+  }
+  const state = stateFor(config);
+  state.token = null;
+  state.expiry = 0;
 }
 
-async function refreshAccessToken(config: ZohoConfig): Promise<string> {
+async function refreshAccessToken(config: ZohoConfig, state: TokenState): Promise<string> {
   console.error("[auth] Refreshing access token...");
 
   const params = new URLSearchParams({
@@ -60,10 +80,10 @@ async function refreshAccessToken(config: ZohoConfig): Promise<string> {
     throw new Error(`Token refresh returned no access_token: ${JSON.stringify(data)}`);
   }
 
-  cachedToken = data.access_token;
+  state.token = data.access_token;
   // Expire 60 seconds early to avoid edge cases
-  tokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
+  state.expiry = Date.now() + Math.max(1, (data.expires_in ?? 3600) - 60) * 1000;
 
   console.error("[auth] Token refreshed successfully");
-  return cachedToken;
+  return state.token;
 }

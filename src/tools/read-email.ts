@@ -3,7 +3,7 @@
 import { z } from "zod";
 import type { ZohoConfig } from "../config.js";
 import type { ZohoEmailContent, ZohoEmailDetails } from "../types.js";
-import { zohoFetch, getAccountId, htmlToPlainText } from "../client.js";
+import { formatZohoDate, zohoData, getAccountId, htmlToPlainText } from "../client.js";
 
 export const readEmailSchema = z.object({
   messageId: z.string().describe("The message ID to read."),
@@ -19,24 +19,10 @@ export async function readEmail(config: ZohoConfig, input: ReadEmailInput): Prom
   // Fetch metadata and content in parallel.
   // The /details endpoint returns metadata (from, to, subject, etc.)
   // The /content endpoint returns the HTML body.
-  const [detailsResponse, contentResponse] = await Promise.all([
-    zohoFetch(config, `${basePath}/details`),
-    zohoFetch(config, `${basePath}/content`),
+  const [details, contentData] = await Promise.all([
+    zohoData<ZohoEmailDetails>(config, `${basePath}/details`),
+    zohoData<ZohoEmailContent>(config, `${basePath}/content`),
   ]);
-
-  if (!detailsResponse.ok) {
-    throw new Error(`Failed to read email details: ${detailsResponse.status} ${await detailsResponse.text()}`);
-  }
-
-  if (!contentResponse.ok) {
-    throw new Error(`Failed to read email content: ${contentResponse.status} ${await contentResponse.text()}`);
-  }
-
-  const detailsBody = await detailsResponse.json();
-  const details = (detailsBody as { data: ZohoEmailDetails }).data;
-
-  const contentBody = await contentResponse.json();
-  const contentData = (contentBody as { data: ZohoEmailContent }).data;
 
   const plainText = htmlToPlainText(contentData.content || "");
 
@@ -50,7 +36,7 @@ export async function readEmail(config: ZohoConfig, input: ReadEmailInput): Prom
     parts.push(`**CC:** ${details.ccAddress}`);
   }
 
-  parts.push(`**Date:** ${details.sentDateInGMT || details.receivedTime}`);
+  parts.push(`**Date:** ${formatZohoDate(details.sentDateInGMT || details.receivedTime)}`);
 
   if (details.hasAttachment === "1") {
     parts.push(`**Attachments:** Yes`);

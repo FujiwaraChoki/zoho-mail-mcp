@@ -25,8 +25,9 @@ export interface ZohoEmailSummary {
   toAddress: string;
   receivedTime: string;
   sentDateInGMT: string;
-  hasAttachment: string;
+  hasAttachment: string | number;
   status2: string;
+  status?: string;
   summary: string;
 }
 
@@ -71,8 +72,31 @@ export interface ZohoSearchResult {
   subject: string;
   sender: string;
   fromAddress: string;
-  receivedTime: string;
-  sentDateInGMT: string;
-  hasAttachment: string;
+  receivedTime?: string;
+  receivedtime?: string | number;
+  sentDateInGMT: string | number;
+  hasAttachment: string | number;
+  status?: string;
   summary: string;
+}
+
+export interface ZohoLabel {
+  labelId: string;
+  tagId?: string;
+  displayName: string;
+  color: string;
+  sequence?: number;
+}
+
+export interface ZohoAttachment {
+  attachmentId: string;
+  attachmentName: string;
+  attachmentSize: number;
+  cid?: string;
+}
+
+export interface ZohoAttachmentInfo {
+  messageId: string;
+  attachments?: ZohoAttachment[];
+  inline?: ZohoAttachment[];
 }

@@ -6,12 +6,29 @@
  *   bun run setup.ts --verify  # Verify existing credentials work
  */
 
-const ZOHO_EU_OAUTH = "https://accounts.zoho.eu/oauth/v2";
+const DATA_CENTERS: Record<string, { accounts: string; mail: string; console: string }> = {
+  us: { accounts: "accounts.zoho.com", mail: "mail.zoho.com", console: "api-console.zoho.com" },
+  eu: { accounts: "accounts.zoho.eu", mail: "mail.zoho.eu", console: "api-console.zoho.eu" },
+  in: { accounts: "accounts.zoho.in", mail: "mail.zoho.in", console: "api-console.zoho.in" },
+  au: { accounts: "accounts.zoho.com.au", mail: "mail.zoho.com.au", console: "api-console.zoho.com.au" },
+  jp: { accounts: "accounts.zoho.jp", mail: "mail.zoho.jp", console: "api-console.zoho.jp" },
+  ca: { accounts: "accounts.zohocloud.ca", mail: "mail.zohocloud.ca", console: "api-console.zohocloud.ca" },
+  sa: { accounts: "accounts.zoho.sa", mail: "mail.zoho.sa", console: "api-console.zoho.sa" },
+  uk: { accounts: "accounts.zoho.uk", mail: "mail.zoho.uk", console: "api-console.zoho.uk" },
+};
+
+function getDataCenter(value = process.env.ZOHO_DATACENTER ?? "eu") {
+  const id = value.toLowerCase();
+  const domains = DATA_CENTERS[id];
+  if (!domains) throw new Error(`Unsupported data center: ${id}`);
+  return { id, ...domains };
+}
 
 async function verify() {
   const clientId = process.env.ZOHO_CLIENT_ID;
   const clientSecret = process.env.ZOHO_CLIENT_SECRET;
   const refreshToken = process.env.ZOHO_REFRESH_TOKEN;
+  const dc = getDataCenter();
 
   if (!clientId || !clientSecret || !refreshToken) {
     console.error("Missing environment variables. Need: ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN");
@@ -27,7 +44,7 @@ async function verify() {
     refresh_token: refreshToken,
   });
 
-  const tokenRes = await fetch(`${ZOHO_EU_OAUTH}/token`, {
+  const tokenRes = await fetch(`https://${dc.accounts}/oauth/v2/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: params.toString(),
@@ -43,7 +60,7 @@ async function verify() {
   console.log("Token refresh: OK");
 
   // Test account access
-  const accountRes = await fetch("https://mail.zoho.eu/api/accounts", {
+  const accountRes = await fetch(`https://${dc.mail}/api/accounts`, {
     headers: { Authorization: `Zoho-oauthtoken ${(tokenData as { access_token: string }).access_token}` },
   });
 
@@ -60,16 +77,18 @@ async function verify() {
 }
 
 async function setup() {
+  const dataCenterInput = prompt("Zoho data center (us/eu/in/au/jp/ca/sa/uk) [eu]: ") || "eu";
+  const dc = getDataCenter(dataCenterInput);
   console.log(`
 === Zoho Mail MCP - OAuth Setup ===
 
 Steps to get your credentials:
 
-1. Go to https://api-console.zoho.eu/
+1. Go to https://${dc.console}/
 2. Click "Add Client" -> "Self Client"
 3. Note down your Client ID and Client Secret
 4. In the Self Client, generate a grant code with these scopes:
-   ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.messages.READ,ZohoMail.messages.CREATE,ZohoMail.messages.DELETE
+   ZohoMail.accounts.READ,ZohoMail.folders.ALL,ZohoMail.messages.ALL,ZohoMail.tags.ALL
 
 5. Set the time duration to 10 minutes
 6. Enter the scope description (e.g., "Claude Code email access")
@@ -96,7 +115,7 @@ Now enter your details below:
     code: grantCode,
   });
 
-  const response = await fetch(`${ZOHO_EU_OAUTH}/token`, {
+  const response = await fetch(`https://${dc.accounts}/oauth/v2/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: params.toString(),
@@ -124,7 +143,7 @@ Add this to your ~/.claude.json under "mcpServers":
     "ZOHO_CLIENT_ID": "${clientId}",
     "ZOHO_CLIENT_SECRET": "${clientSecret}",
     "ZOHO_REFRESH_TOKEN": "${typed.refresh_token}",
-    "ZOHO_DATACENTER": "eu"
+    "ZOHO_DATACENTER": "${dc.id}"
   }
 }
 

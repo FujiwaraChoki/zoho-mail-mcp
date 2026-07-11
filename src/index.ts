@@ -10,21 +10,45 @@ import { searchEmailsSchema, searchEmails } from "./tools/search-emails.js";
 import { sendEmailSchema, sendEmail } from "./tools/send-email.js";
 import { replyEmailSchema, replyEmail } from "./tools/reply-email.js";
 import { deleteEmailSchema, deleteEmail } from "./tools/delete-email.js";
+import { listAccountsSchema, listAccounts } from "./tools/list-accounts.js";
+import { updateEmailsSchema, updateEmails } from "./tools/update-emails.js";
+import { manageFolderSchema, manageFolder } from "./tools/manage-folders.js";
+import { listLabelsSchema, manageLabelSchema, listLabels, manageLabel } from "./tools/labels.js";
+import { saveDraftSchema, saveDraft } from "./tools/save-draft.js";
+import {
+  downloadAttachmentSchema,
+  listAttachmentsSchema,
+  downloadAttachment,
+  listAttachments,
+} from "./tools/attachments.js";
 
 const config = loadConfig();
 
 const server = new McpServer({
   name: "zoho-mail",
-  version: "1.0.0",
+  version: "2.0.0",
 });
+
+server.tool(
+  "list_accounts",
+  "List accessible Zoho Mail accounts and show the configured account selection.",
+  listAccountsSchema.shape,
+  async (input) => {
+    try {
+      return { content: [{ type: "text", text: await listAccounts(config, input) }] };
+    } catch (error) {
+      return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+    }
+  },
+);
 
 server.tool(
   "list_folders",
   "List all mail folders with unread/total counts.",
   listFoldersSchema.shape,
-  async () => {
+  async (input) => {
     try {
-      const result = await listFolders(config);
+      const result = await listFolders(config, input.refresh);
       return { content: [{ type: "text", text: result }] };
     } catch (error) {
       return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
@@ -33,8 +57,47 @@ server.tool(
 );
 
 server.tool(
+  "manage_folder",
+  "Create, rename, move, mark read, empty, or delete a mail folder. Destructive actions require confirmation.",
+  manageFolderSchema.shape,
+  async (input) => {
+    try {
+      return { content: [{ type: "text", text: await manageFolder(config, input) }] };
+    } catch (error) {
+      return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+    }
+  },
+);
+
+server.tool(
+  "list_labels",
+  "List mail labels with colors and IDs.",
+  listLabelsSchema.shape,
+  async () => {
+    try {
+      return { content: [{ type: "text", text: await listLabels(config) }] };
+    } catch (error) {
+      return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+    }
+  },
+);
+
+server.tool(
+  "manage_label",
+  "Create, update, or delete a Zoho Mail label.",
+  manageLabelSchema.shape,
+  async (input) => {
+    try {
+      return { content: [{ type: "text", text: await manageLabel(config, input) }] };
+    } catch (error) {
+      return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+    }
+  },
+);
+
+server.tool(
   "list_emails",
-  "List emails in a folder (default: Inbox). Returns subject, sender, date, and IDs.",
+  "List and filter emails, optionally within a folder. Returns subject, sender, date, and IDs.",
   listEmailsSchema.shape,
   async (input) => {
     try {
@@ -62,7 +125,7 @@ server.tool(
 
 server.tool(
   "search_emails",
-  "Search emails by keyword across all folders.",
+  "Search emails across all folders using plain text or Zoho's advanced search syntax and filters.",
   searchEmailsSchema.shape,
   async (input) => {
     try {
@@ -76,7 +139,7 @@ server.tool(
 
 server.tool(
   "send_email",
-  "Send a new email from your Zoho account.",
+  "Send or schedule an email, optionally with read receipt and local file attachments.",
   sendEmailSchema.shape,
   async (input) => {
     try {
@@ -89,8 +152,21 @@ server.tool(
 );
 
 server.tool(
+  "save_draft",
+  "Save an email as a draft or template, optionally with attachments and reply threading headers.",
+  saveDraftSchema.shape,
+  async (input) => {
+    try {
+      return { content: [{ type: "text", text: await saveDraft(config, input) }] };
+    } catch (error) {
+      return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+    }
+  },
+);
+
+server.tool(
   "reply_email",
-  "Reply to an existing email. Supports reply and reply-all.",
+  "Reply or reply-all to an existing email immediately or on a schedule.",
   replyEmailSchema.shape,
   async (input) => {
     try {
@@ -114,6 +190,45 @@ server.tool(
       return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
     }
   }
+);
+
+server.tool(
+  "update_emails",
+  "Bulk mark read/unread, move, flag, label, archive/unarchive, or mark messages as spam/not spam.",
+  updateEmailsSchema.shape,
+  async (input) => {
+    try {
+      return { content: [{ type: "text", text: await updateEmails(config, input) }] };
+    } catch (error) {
+      return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+    }
+  },
+);
+
+server.tool(
+  "list_attachments",
+  "List attachment names, sizes, and IDs for an email.",
+  listAttachmentsSchema.shape,
+  async (input) => {
+    try {
+      return { content: [{ type: "text", text: await listAttachments(config, input) }] };
+    } catch (error) {
+      return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+    }
+  },
+);
+
+server.tool(
+  "download_attachment",
+  "Download an email attachment to a local directory.",
+  downloadAttachmentSchema.shape,
+  async (input) => {
+    try {
+      return { content: [{ type: "text", text: await downloadAttachment(config, input) }] };
+    } catch (error) {
+      return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+    }
+  },
 );
 
 async function main() {
